@@ -1,0 +1,86 @@
+Introduction.
+
+This tutorial will demonstrate how to install and configure uwsgi and nginx on Ubuntu 14.04 to  serve Django applications
+
+Install uwsgi and nginx.
+
+sudo apt-get update
+sudo apt-get install nginx uwsgi uwsgi-plugin-python3  -y
+
+Configure uWSGi.
+
+Create uwsgi configuration file
+sudo vim /etc/uwsgi/apps-available/uwsgi.ini 
+
+
+[uwsgi]
+virtualenv = {{ virtual_env path }}                             #virtualenv support if python libraries and interpreter are installed in virtual enviroment                
+uid = www-data                                                  #user running uwsgi
+gid = www-data                                                  #group running uwsgi
+chmod-socket = 664                                              #uwsgi socket permission (srw-rw-r--)
+chown-socket = www-data                                         #uwsgi socket owner      (srw-rw-r-- 1 www-data www-data)
+processes=4                                                     #number of uwsgi processes
+threads=2                                                       #number of threads of each process
+master=true                                                     #master process to manage all uwsgi processes
+env = DJANGO_SETTINGS_MODULE={{ dir_name }}.settings            #load django settings module
+module = django.core.wsgi:get_wsgi_application()                #load wsgi module
+chdir = {{ project_directory }}                                 #django project directory
+socket = /tmp/{{site_name}}.sock                                #unix socket for communication of other servers like nginx
+logto = /var/log/uwsgi/{{site_name}}.log                        #uwsgi log file location
+vacuum=true                                                     #uwsgi socket {socket = /tmp/{{site_name}}.sock} will automatically cleanup when service stop
+thunder-lock                                                    #To avoid deadlock in uwsgi threads
+memory-report                                                   #will give memory usage of each process in log file at location { logto = /var/log/uwsgi/{{site_name}}.log }
+max-requests=10000                                              #uwsgi will respawn new process after requests served define by the argument
+no-orphans = true                                               #No single process will exists wihtout master
+limit-as=784                                                    #Single uwsgi process can not reserve more address space(ram + disk) define by this parameter , this parameter is necessary to avoid memory leakage 
+reload-on-as=784                                                #uwsgi process will reload with same request call if try to allocate more address space
+reload-on-rss=512                                               #Single uwsgi process can not resver more sapce in memory area define by this parameter
+
+
+
+
+Enable uwsgi configuration 
+
+cd /etc/uwsgi/apps-enabled/ 
+ln -s /etc/uwsgi/apps-available/uwsgi.ini  .
+
+Restart uwsgi service and load new configuration 
+
+/etc/init.d/uwsgi restart
+
+
+
+
+Configure Nginx as reverse proxy.
+
+After nginx installed , create server block configuration for project.
+
+sudo vim sudo nano /etc/nginx/sites-available/{{ virtual_host }}
+
+server {
+        listen 80;
+        server_name  {{ domain_name }};
+        access_log  /var/log/nginx/{{ domain_name}}_access.log;
+        error_log  /var/log/nginx/{{ domain_name}}_error.log;
+
+        location / {
+             uwsgi_pass unix:///tmp/{{site_name}}.sock;        #uwsgi socket that nginx will communicate for requests and responses
+             include     uwsgi_params;
+             uwsgi_read_timeout 300;
+    }
+}
+
+
+Enable nginx virtual host configuration
+
+cd /etc/nginx/sites-enabled/
+ln -s  cd /etc/nginx/sites-availble/{{ virtual_host }} .
+
+Check nginx configuration
+
+nginx -t  (Return Ok if there is no error in configuration)
+
+Reload nginx and new virtual host configuration
+
+/etc/init.c/nginx restart
+
