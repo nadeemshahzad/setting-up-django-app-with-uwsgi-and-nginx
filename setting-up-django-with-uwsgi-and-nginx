@@ -74,7 +74,7 @@ server {
 Enable nginx virtual host configuration
 
 cd /etc/nginx/sites-enabled/
-ln -s  cd /etc/nginx/sites-availble/{{ virtual_host }} .
+ln -s  /etc/nginx/sites-availble/{{ virtual_host }} .
 
 Check nginx configuration
 
